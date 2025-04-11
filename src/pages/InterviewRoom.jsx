@@ -22,11 +22,10 @@ export default function InterviewRoom() {
   const [chat, setChat] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [userProfiles, setUserProfiles] = useState({});
-  const [currentUserData, setCurrentUserData] = useState({});
-  const [otherUserId, setOtherUserId] = useState("");
   const [error, setError] = useState("");
+  const [otherUserId, setOtherUserId] = useState("");
+  const [currentUserId, setCurrentUserId] = useState("");
 
-  // Setup video and WebRTC
   useEffect(() => {
     const init = async () => {
       try {
@@ -36,39 +35,58 @@ export default function InterviewRoom() {
         });
         myVideo.current.srcObject = stream;
 
+        const currentUser = auth.currentUser;
+        if (!currentUser) return;
+
+        setCurrentUserId(currentUser.uid);
         const callDoc = doc(db, "interviews", id);
 
-        const unsubscribe = onSnapshot(callDoc, async (snap) => {
-          const data = snap.data();
+        // Listener for offer/answer
+        const unsub = onSnapshot(callDoc, async (docSnap) => {
+          const data = docSnap.data();
+          if (!data) return;
 
-          if (data && data.offer && !peerRef.current) {
+          // Set the other user ID
+          if (data.offerUserId && data.offerUserId !== currentUser.uid) {
+            setOtherUserId(data.offerUserId);
+          } else if (data.answerUserId && data.answerUserId !== currentUser.uid) {
+            setOtherUserId(data.answerUserId);
+          }
+
+          // Handle answer if I'm the offerer
+          if (data.answer && peerRef.current && !peerRef.current.connected) {
+            peerRef.current.signal(data.answer);
+          }
+
+          // Handle offer if I'm the answerer
+          if (data.offer && !peerRef.current && data.offerUserId !== currentUser.uid) {
             const peer = new Peer({ initiator: false, trickle: false, stream });
 
             peer.on("signal", async (answer) => {
-              await updateDoc(callDoc, { answer });
+              await updateDoc(callDoc, {
+                answer,
+                answerUserId: currentUser.uid,
+              });
             });
 
             peer.on("stream", (remoteStream) => {
               userVideo.current.srcObject = remoteStream;
             });
 
-            if (data.offerUserId) {
-              setOtherUserId(data.offerUserId);
-            }
-
             peer.signal(data.offer);
             peerRef.current = peer;
           }
         });
 
-        const docSnap = await getDoc(callDoc);
-        if (!docSnap.exists()) {
+        // Create offer if doc doesn't exist
+        const docData = await getDoc(callDoc);
+        if (!docData.exists()) {
           const peer = new Peer({ initiator: true, trickle: false, stream });
 
           peer.on("signal", async (offer) => {
             await setDoc(callDoc, {
               offer,
-              offerUserId: auth.currentUser.uid,
+              offerUserId: currentUser.uid,
               messages: [],
             });
           });
@@ -78,54 +96,23 @@ export default function InterviewRoom() {
           });
 
           peerRef.current = peer;
-        } else {
-          const data = docSnap.data();
-          if (data.offerUserId && data.offerUserId !== auth.currentUser.uid) {
-            setOtherUserId(data.offerUserId);
-          }
         }
+
+        return () => unsub();
       } catch (err) {
-        console.error("Media error:", err);
-        setError(
-          "Camera or microphone is already in use or blocked. Please close other apps or check permissions."
-        );
+        console.error(err);
+        setError("Camera/mic issue: please check permissions or close other apps.");
       }
     };
 
     init();
   }, [id]);
 
-  // Send chat message
-  const sendMessage = async () => {
-    if (!newMessage.trim()) return;
-
-    const messageRef = doc(db, "interviews", id);
-    const docSnap = await getDoc(messageRef);
-
-    if (!docSnap.exists()) {
-      await setDoc(messageRef, {
-        messages: [],
-        offer: null,
-      });
-    }
-
-    await updateDoc(messageRef, {
-      messages: arrayUnion({
-        text: newMessage,
-        sender: auth.currentUser.uid,
-        time: new Date().toISOString(),
-      }),
-    });
-
-    setNewMessage("");
-  };
-
   // Load messages
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "interviews", id), (docSnap) => {
       if (docSnap.exists()) {
-        const data = docSnap.data();
-        setChat(data.messages || []);
+        setChat(docSnap.data().messages || []);
       }
     });
 
@@ -141,18 +128,29 @@ export default function InterviewRoom() {
         const data = doc.data();
         users[data.uid] = data;
       });
-
       setUserProfiles(users);
-      const currentUser = auth.currentUser.uid;
-      setCurrentUserData(users[currentUser] || {});
     };
 
     fetchUsers();
   }, []);
 
-  const otherUserName =
-    userProfiles[otherUserId]?.name || "Other Participant";
-  const currentUserName = currentUserData?.name || "You";
+  const sendMessage = async () => {
+    if (!newMessage.trim()) return;
+    const messageRef = doc(db, "interviews", id);
+
+    await updateDoc(messageRef, {
+      messages: arrayUnion({
+        text: newMessage,
+        sender: auth.currentUser.uid,
+        time: new Date().toISOString(),
+      }),
+    });
+
+    setNewMessage("");
+  };
+
+  const currentUserName = userProfiles[currentUserId]?.name || "You";
+  const otherUserName = userProfiles[otherUserId]?.name || "Other Participant";
 
   return (
     <div className="p-4 flex flex-col items-center">
@@ -196,8 +194,7 @@ export default function InterviewRoom() {
           {chat.map((msg, index) => (
             <p key={index} className="text-sm mb-1">
               <strong>
-                {userProfiles[msg.sender]?.name ||
-                  (msg.sender === auth.currentUser.uid ? "You" : "Other")}
+                {userProfiles[msg.sender]?.name || (msg.sender === auth.currentUser.uid ? "You" : "Other")}
               </strong>
               : {msg.text}
               <span className="text-xs text-gray-500 ml-2">
