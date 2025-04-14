@@ -9,6 +9,7 @@ import InterviewerList from "./pages/Home";
 import InterviewerProfile from "./pages/InterViwer/InterViwerProfile";
 import InterviewHome from "./pages/InterViwer/InterViewerHome";
 import InterviewRoom from "./pages/InterviewRoom";
+import Conversations from "./pages/Conversations";
 "./pages/CorporateDashboard";
 
 function App() {
@@ -40,6 +41,8 @@ function App() {
 
         <Route path="/interview-home" element={<InterviewHome />} />
         <Route path="/interview-room/:id" element={<InterviewRoom />} />
+        <Route path="/conversations/:id" element={<Conversations />} />
+        
 
       </Routes>
 

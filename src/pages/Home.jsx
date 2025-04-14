@@ -27,7 +27,7 @@ export default function InterviewerList() {
           <div
             key={interviewer.id}
             className="p-4 border rounded cursor-pointer"
-            onClick={() => navigate(`/interviewer/${interviewer.id}`)}
+            onClick={() => navigate(`/conversations/${interviewer.uid}`)}
           >
             <h3 className="text-lg font-semibold">{interviewer.name}</h3>
             <p>{interviewer.bio}</p>

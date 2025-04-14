@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase";
 import {
   doc,
@@ -15,6 +15,8 @@ import Peer from "simple-peer";
 
 export default function InterviewRoom() {
   const { id } = useParams();
+  const navigate = useNavigate();
+
   const myVideo = useRef();
   const userVideo = useRef();
   const peerRef = useRef();
@@ -41,24 +43,20 @@ export default function InterviewRoom() {
         setCurrentUserId(currentUser.uid);
         const callDoc = doc(db, "interviews", id);
 
-        // Listener for offer/answer
         const unsub = onSnapshot(callDoc, async (docSnap) => {
           const data = docSnap.data();
           if (!data) return;
 
-          // Set the other user ID
           if (data.offerUserId && data.offerUserId !== currentUser.uid) {
             setOtherUserId(data.offerUserId);
           } else if (data.answerUserId && data.answerUserId !== currentUser.uid) {
             setOtherUserId(data.answerUserId);
           }
 
-          // Handle answer if I'm the offerer
           if (data.answer && peerRef.current && !peerRef.current.connected) {
             peerRef.current.signal(data.answer);
           }
 
-          // Handle offer if I'm the answerer
           if (data.offer && !peerRef.current && data.offerUserId !== currentUser.uid) {
             const peer = new Peer({ initiator: false, trickle: false, stream });
 
@@ -78,7 +76,6 @@ export default function InterviewRoom() {
           }
         });
 
-        // Create offer if doc doesn't exist
         const docData = await getDoc(callDoc);
         if (!docData.exists()) {
           const peer = new Peer({ initiator: true, trickle: false, stream });
@@ -108,18 +105,15 @@ export default function InterviewRoom() {
     init();
   }, [id]);
 
-  // Load messages
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "interviews", id), (docSnap) => {
       if (docSnap.exists()) {
         setChat(docSnap.data().messages || []);
       }
     });
-
     return () => unsub();
   }, [id]);
 
-  // Load user profiles
   useEffect(() => {
     const fetchUsers = async () => {
       const usersSnapshot = await getDocs(collection(db, "users"));
@@ -149,12 +143,31 @@ export default function InterviewRoom() {
     setNewMessage("");
   };
 
+  const stopCall = () => {
+    if (peerRef.current) {
+      peerRef.current.destroy();
+      peerRef.current = null;
+    }
+
+    if (myVideo.current?.srcObject) {
+      myVideo.current.srcObject.getTracks().forEach((track) => track.stop());
+      myVideo.current.srcObject = null;
+    }
+
+    if (userVideo.current?.srcObject) {
+      userVideo.current.srcObject.getTracks().forEach((track) => track.stop());
+      userVideo.current.srcObject = null;
+    }
+
+    navigate("/");
+  };
+
   const currentUserName = userProfiles[currentUserId]?.name || "You";
   const otherUserName = userProfiles[otherUserId]?.name || "Other Participant";
 
   return (
     <div className="p-4 flex flex-col items-center">
-      <h2 className="text-xl font-bold mb-4">Interview Room</h2>
+      <h2 className="bg-blue-100 text-xl font-bold mb-4">Interview Room</h2>
 
       {error && (
         <div className="text-red-600 bg-red-100 p-2 rounded w-full max-w-md text-center mb-4">
@@ -188,6 +201,13 @@ export default function InterviewRoom() {
           </div>
         </div>
       </div>
+
+      <button
+        onClick={stopCall}
+        className="mt-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded shadow"
+      >
+        End Call
+      </button>
 
       <div className="mt-6 w-full max-w-md">
         <div className="h-40 overflow-y-auto border p-2 rounded bg-gray-100">

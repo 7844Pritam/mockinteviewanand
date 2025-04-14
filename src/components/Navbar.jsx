@@ -42,6 +42,12 @@ export default function Navbar() {
 
       {userInfo ? (
         <div className="flex items-center space-x-4">
+          <button
+            onClick={() => navigate("/become-interviewer")}
+            className="px-4 py-2 text-sm text-white bg-green-600 rounded hover:bg-green-700"
+          >
+            Become Interviewer
+          </button>
           <span className="text-sm font-medium text-gray-700">
             {userInfo.name || userInfo.email}
           </span>
@@ -58,6 +64,7 @@ export default function Navbar() {
         </div>
       ) : (
         <div className="space-x-4">
+          
           <button
             onClick={() => navigate("/signin")}
             className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
@@ -70,6 +77,7 @@ export default function Navbar() {
           >
             Sign Up
           </button>
+
         </div>
       )}
     </nav>

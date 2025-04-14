@@ -78,6 +78,7 @@ export default function BecomeInterviewerForm() {
           required
         />
         <button
+        onClick={() => navigate("/interview-home")}
           type="submit"
           className="bg-blue-600 text-white px-4 py-2 rounded"
         >

@@ -43,7 +43,7 @@ export default function SignUpScreen() {
           createdAt: new Date(),
         });
 
-        navigate("/become-interviewer"); // redirect after signup
+        navigate("/"); // redirect after signup
       } catch (error) {
         console.error("Signup error:", error);
         setErrorMessage(error.message);
