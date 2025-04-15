@@ -39,10 +39,10 @@ export default function LoginScreen() {
           values.password
         );
 
-        const user = userCredential.user;
+        const mockUsers = userCredential.mockUsers;
 
-        // Fetch user role from Firestore
-        const q = query(collection(db, "users"), where("uid", "==", user.uid));
+        // Fetch mockUsers role from Firestore
+        const q = query(collection(db, "mockUsers"), where("uid", "==", mockUsers.uid));
         const snapshot = await getDocs(q);
 
         if (!snapshot.empty) {

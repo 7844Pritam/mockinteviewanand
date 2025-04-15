@@ -22,7 +22,7 @@ export default function ProfileDetail() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
-          const q = query(collection(db, "users"), where("uid", "==", user.uid));
+          const q = query(collection(db, "mockUsers"), where("uid", "==", user.uid));
           const snapshot = await getDocs(q);
           if (!snapshot.empty) {
             setProfile({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() });
@@ -48,7 +48,7 @@ export default function ProfileDetail() {
     const interviewTime = Timestamp.fromDate(new Date(Date.now() + 2 * 60 * 1000)); // 2 minutes
 
     // const interviewTime = Timestamp.fromDate(new Date(Date.now() + 2 * 60 * 60 * 1000)); // 2 hours
-    await updateDoc(doc(db, "users", profile.id), {
+    await updateDoc(doc(db, "mockUsers", profile.id), {
       isAccepted: true,
       interviewTime
     });

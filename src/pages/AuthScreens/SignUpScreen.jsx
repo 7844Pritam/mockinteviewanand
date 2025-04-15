@@ -7,6 +7,8 @@ import { auth, db } from "../../firebase";
 import * as Yup from "yup";
 import { useFormik } from "formik";
 import { collection, addDoc } from "firebase/firestore";
+import React from 'react';  // Add this line to resolve the error
+
 
 // Validation Schema
 const validationSchema = Yup.object().shape({
@@ -35,7 +37,7 @@ export default function SignUpScreen() {
         const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
         const user = userCredential.user;
 
-        await addDoc(collection(db, "users"), {
+        await addDoc(collection(db, "mockUsers"), {
           uid: user.uid,
           name: values.name,
           email: user.email,

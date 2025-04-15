@@ -21,7 +21,7 @@ export default function InterviewerProfile() {
       const user = auth.currentUser;
       if (user) setCurrentUserId(user.uid);
 
-      const ref = doc(db, "users", id);
+      const ref = doc(db, "mockUsers", id);
       const snap = await getDoc(ref);
       if (snap.exists()) {
         const data = { id: snap.id, ...snap.data() };

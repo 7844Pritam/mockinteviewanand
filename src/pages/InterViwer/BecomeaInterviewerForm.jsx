@@ -1,3 +1,4 @@
+// BecomeInterviewerForm.js
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../../firebase";
@@ -21,7 +22,7 @@ export default function BecomeInterviewerForm() {
     const user = auth.currentUser;
     if (!user) return;
 
-    const q = query(collection(db, "users"), where("uid", "==", user.uid));
+    const q = query(collection(db, "mockUsers"), where("uid", "==", user.uid));
     const querySnapshot = await getDocs(q);
     if (!querySnapshot.empty) {
       const docRef = querySnapshot.docs[0].ref;
@@ -34,7 +35,7 @@ export default function BecomeInterviewerForm() {
         price: parseInt(formData.price),
       });
 
-      navigate("/");
+      navigate("/interviewers");  // Redirect to the profile page
     }
   };
 
@@ -78,7 +79,6 @@ export default function BecomeInterviewerForm() {
           required
         />
         <button
-        onClick={() => navigate("/interview-home")}
           type="submit"
           className="bg-blue-600 text-white px-4 py-2 rounded"
         >
