@@ -4,7 +4,7 @@ import { getAuth } from 'firebase/auth';
 import { ref, onValue, set, push, remove } from 'firebase/database';
 import { db as realtimeDB } from '../../firebase';
 import { generateChatId } from '../../utils/GenerateChatId';
-import ChatBox from './ChatBox'; // Reuse your existing ChatBox component
+import ChatBox from './ChatBox';
 
 const servers = {
     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
@@ -23,15 +23,13 @@ const VideoChatBox = () => {
     const peerConnection = useRef(null);
     const localStream = useRef(null);
 
-    const { id: interviewId } = useParams();
+    const { id: otherId } = useParams();
     const navigate = useNavigate();
     const auth = getAuth();
     const currentUser = auth.currentUser;
-//jsdhfisughfaiusdh
-    const chatId =
-        currentUser && interviewId
-            ? generateChatId(currentUser.uid, interviewId)
-            : null;
+
+    const myId = currentUser?.uid;
+    const chatId = myId && otherId ? generateChatId(myId, otherId) : null;
 
     useEffect(() => {
         const init = async () => {
@@ -58,18 +56,12 @@ const VideoChatBox = () => {
 
             peerConnection.current.onicecandidate = (event) => {
                 if (event.candidate) {
-                    const iceRef = ref(
-                        realtimeDB,
-                        `videoChats/${chatId}/iceCandidates/${currentUser.uid}`
-                    );
-                    push(iceRef, event.candidate.toJSON());
+                    const myIceRef = ref(realtimeDB, `videoChats/${chatId}/iceCandidates/${myId}`);
+                    push(myIceRef, event.candidate.toJSON());
                 }
             };
 
-            const otherIceRef = ref(
-                realtimeDB,
-                `videoChats/${chatId}/iceCandidates/${interviewId}`
-            );
+            const otherIceRef = ref(realtimeDB, `videoChats/${chatId}/iceCandidates/${otherId}`);
             onValue(otherIceRef, (snapshot) => {
                 snapshot.forEach((child) => {
                     const candidate = new RTCIceCandidate(child.val());
@@ -82,7 +74,7 @@ const VideoChatBox = () => {
                 const data = snapshot.val();
                 if (!data) return;
 
-                if (data.offer && data.offer.sender !== currentUser.uid) {
+                if (data.offer && data.offer.sender !== myId) {
                     await peerConnection.current.setRemoteDescription(
                         new RTCSessionDescription(data.offer)
                     );
@@ -90,13 +82,10 @@ const VideoChatBox = () => {
                     await peerConnection.current.setLocalDescription(answer);
                     await set(signalRef, {
                         ...data,
-                        answer: { ...answer, sender: currentUser.uid },
+                        answer: { ...answer, sender: myId, receiver: otherId },
                     });
                     setCallStarted(true);
-                } else if (
-                    data.answer &&
-                    data.answer.sender !== currentUser.uid
-                ) {
+                } else if (data.answer && data.answer.sender !== myId) {
                     await peerConnection.current.setRemoteDescription(
                         new RTCSessionDescription(data.answer)
                     );
@@ -105,52 +94,47 @@ const VideoChatBox = () => {
             });
         };
 
-        if (currentUser && interviewId) {
+        if (myId && otherId) {
             init();
         }
 
         return () => {
-            endCall(); // Cleanup when component unmounts
+            endCall();
         };
 
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentUser, interviewId]);
+    }, [myId, otherId]);
 
     const startCall = async () => {
         const offer = await peerConnection.current.createOffer();
         await peerConnection.current.setLocalDescription(offer);
         const signalRef = ref(realtimeDB, `videoChats/${chatId}/signals`);
         await set(signalRef, {
-            offer: { ...offer, sender: currentUser.uid },
+            offer: { ...offer, sender: myId, receiver: otherId },
         });
         setCallStarted(true);
     };
 
     const endCall = async () => {
         try {
-            // ✅ Stop all local tracks (camera + mic)
             if (localStream.current) {
                 localStream.current.getTracks().forEach((track) => track.stop());
                 localStream.current = null;
             }
 
-            // ✅ Close peer connection
             if (peerConnection.current) {
                 peerConnection.current.close();
                 peerConnection.current = null;
             }
 
-            // ✅ Clear video refs
             if (localVideoRef.current) localVideoRef.current.srcObject = null;
             if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
 
-            // ✅ Remove signaling data from Firebase
             if (chatId) {
                 await remove(ref(realtimeDB, `videoChats/${chatId}/signals`));
                 await remove(ref(realtimeDB, `videoChats/${chatId}/iceCandidates`));
             }
 
-            // ✅ Reset all UI-related states
             setCallStarted(false);
             setMicOn(true);
             setCamOn(true);
@@ -158,15 +142,11 @@ const VideoChatBox = () => {
             setRemoteStream(null);
             setChatOpen(false);
 
-            // ✅ Navigate home
             navigate('/interviewers');
         } catch (err) {
             console.error('Error ending call:', err);
         }
     };
-
-
-
 
     const toggleMic = () => {
         const audioTrack = localStream.current
@@ -193,7 +173,6 @@ const VideoChatBox = () => {
         alert(`You ${handRaised ? 'lowered' : 'raised'} your hand ✋`);
     };
 
-/////////////////////////screen share//////////////////////
     const toggleScreenShare = async () => {
         try {
             const screenStream = await navigator.mediaDevices.getDisplayMedia({
@@ -202,7 +181,6 @@ const VideoChatBox = () => {
 
             const screenTrack = screenStream.getVideoTracks()[0];
 
-            // Replace the current video track with screen share
             const sender = peerConnection.current
                 ?.getSenders()
                 .find((s) => s.track?.kind === 'video');
@@ -210,12 +188,10 @@ const VideoChatBox = () => {
                 sender.replaceTrack(screenTrack);
             }
 
-            // Display the shared screen locally too
             if (localVideoRef.current) {
                 localVideoRef.current.srcObject = screenStream;
             }
 
-            // When the screen is stopped, revert back to webcam
             screenTrack.onended = async () => {
                 const videoTrack = localStream.current
                     ?.getTracks()
@@ -233,10 +209,8 @@ const VideoChatBox = () => {
         }
     };
 
-
     return (
         <div className="relative flex flex-col items-center justify-center min-h-screen bg-gray-100">
-            {/* Video Feed */}
             <div className="flex gap-6 mb-4">
                 <video
                     ref={localVideoRef}
@@ -253,7 +227,6 @@ const VideoChatBox = () => {
                 />
             </div>
 
-            {/* Call Controls */}
             <div className="flex flex-wrap gap-4 mb-4">
                 {!callStarted && (
                     <button
@@ -293,7 +266,6 @@ const VideoChatBox = () => {
                 >
                     Share Screen 🖥️
                 </button>
-
                 <button
                     onClick={() => setChatOpen((prev) => !prev)}
                     className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -302,10 +274,9 @@ const VideoChatBox = () => {
                 </button>
             </div>
 
-            {/* Chat Box */}
             {chatOpen && (
                 <div className="absolute top-6 right-6 z-20 w-[350px] h-[600px]">
-                    <ChatBox interviewId={interviewId} />
+                    <ChatBox interviewId={otherId} />
                 </div>
             )}
         </div>
