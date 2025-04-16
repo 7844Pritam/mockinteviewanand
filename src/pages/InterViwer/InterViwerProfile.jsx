@@ -64,7 +64,7 @@ export default function InterviewerProfile() {
     if (!user) return alert("Please log in first.");
     setLoading(true);
     try {
-      const ref = doc(db, "users", profile.id);
+      const ref = doc(db, "mockUsers", profile.id);
       await updateDoc(ref, {
         isBooked: true,
         bookedBy: user.uid,
@@ -81,7 +81,7 @@ export default function InterviewerProfile() {
   };
 
   const handleAcceptInterview = async () => {
-    const ref = doc(db, "users", profile.id);
+    const ref = doc(db, "mockUsers", profile.id);
     const interviewTime = Timestamp.fromDate(new Date(Date.now() + 2 * 60 * 1000)); // 2 hours
     await updateDoc(ref, {
       isAccepted: true,
