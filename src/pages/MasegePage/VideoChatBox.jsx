@@ -36,63 +36,77 @@ const SimpleVideoChat = () => {
         const setupConnection = async () => {
             if (!myId || !otherId) return;
 
-            console.log('Initializing local media...');
-            localStream.current = await navigator.mediaDevices.getUserMedia({
-                video: true,
-                audio: true,
-            });
-            localVideoRef.current.srcObject = localStream.current;
+            try {
+                console.log('Initializing screen sharing...');
+                const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-            peerConnection.current = new RTCPeerConnection(servers);
-            console.log('RTCPeerConnection created.');
+                screenStream.addTrack(audioStream.getAudioTracks()[0]);
 
-            localStream.current.getTracks().forEach((track) => {
-                peerConnection.current.addTrack(track, localStream.current);
-            });
+                localStream.current = screenStream;
+                localVideoRef.current.srcObject = screenStream;
 
-            peerConnection.current.ontrack = (event) => {
-                console.log('Received remote track.');
-                remoteVideoRef.current.srcObject = event.streams[0];
-            };
-
-            peerConnection.current.onicecandidate = (event) => {
-                if (event.candidate) {
-                    console.log('Sending ICE candidate.');
-                    const iceRef = ref(realtimeDB, `videoChats/${chatId}/iceCandidates/${myId}`);
-                    push(iceRef, event.candidate.toJSON());
-                }
-            };
-
-            const iceRef = ref(realtimeDB, `videoChats/${chatId}/iceCandidates/${otherId}`);
-            onValue(iceRef, (snapshot) => {
-                snapshot.forEach((child) => {
-                    const candidate = new RTCIceCandidate(child.val());
-                    console.log('Adding remote ICE candidate.');
-                    peerConnection.current.addIceCandidate(candidate);
+                // Handle screen sharing stop
+                screenStream.getVideoTracks()[0].addEventListener('ended', () => {
+                    console.log('Screen sharing stopped');
+                    endCall();
                 });
-            });
 
-            const signalRef = ref(realtimeDB, `videoChats/${chatId}/signals`);
-            onValue(signalRef, async (snapshot) => {
-                const data = snapshot.val();
-                if (!data) return;
+                peerConnection.current = new RTCPeerConnection(servers);
+                console.log('RTCPeerConnection created.');
 
-                if (data.offer && data.offer.sender !== myId) {
-                    console.log('Received offer. Creating answer...');
-                    await peerConnection.current.setRemoteDescription(new RTCSessionDescription(data.offer));
-                    const answer = await peerConnection.current.createAnswer();
-                    await peerConnection.current.setLocalDescription(answer);
-                    await set(signalRef, {
-                        ...data,
-                        answer: { ...answer, sender: myId },
+                localStream.current.getTracks().forEach((track) => {
+                    peerConnection.current.addTrack(track, localStream.current);
+                });
+
+                peerConnection.current.ontrack = (event) => {
+                    console.log('Received remote track.');
+                    remoteVideoRef.current.srcObject = event.streams[0];
+                };
+
+                peerConnection.current.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        console.log('Sending ICE candidate.');
+                        const iceRef = ref(realtimeDB, `videoChats/${chatId}/iceCandidates/${myId}`);
+                        push(iceRef, event.candidate.toJSON());
+                    }
+                };
+
+                const iceRef = ref(realtimeDB, `videoChats/${chatId}/iceCandidates/${otherId}`);
+                onValue(iceRef, (snapshot) => {
+                    snapshot.forEach((child) => {
+                        const candidate = new RTCIceCandidate(child.val());
+                        console.log('Adding remote ICE candidate.');
+                        peerConnection.current.addIceCandidate(candidate);
                     });
-                    setConnected(true);
-                } else if (data.answer && data.answer.sender !== myId) {
-                    console.log('Received answer.');
-                    await peerConnection.current.setRemoteDescription(new RTCSessionDescription(data.answer));
-                    setConnected(true);
-                }
-            });
+                });
+
+                const signalRef = ref(realtimeDB, `videoChats/${chatId}/signals`);
+                onValue(signalRef, async (snapshot) => {
+                    const data = snapshot.val();
+                    if (!data) return;
+
+                    if (data.offer && data.offer.sender !== myId) {
+                        console.log('Received offer. Creating answer...');
+                        await peerConnection.current.setRemoteDescription(new RTCSessionDescription(data.offer));
+                        const answer = await peerConnection.current.createAnswer();
+                        await peerConnection.current.setLocalDescription(answer);
+                        await set(signalRef, {
+                            ...data,
+                            answer: { ...answer, sender: myId },
+                        });
+                        setConnected(true);
+                    } else if (data.answer && data.answer.sender !== myId) {
+                        console.log('Received answer.');
+                        await peerConnection.current.setRemoteDescription(new RTCSessionDescription(data.answer));
+                        setConnected(true);
+                    }
+                });
+
+            } catch (err) {
+                console.error('Error during screen sharing setup:', err);
+                alert('Error accessing screen or audio. Please check permissions.');
+            }
         };
 
         setupConnection();
@@ -130,7 +144,7 @@ const SimpleVideoChat = () => {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900">
             <div className="flex gap-4">
                 <video ref={localVideoRef} autoPlay muted playsInline className="w-64 h-48 bg-black rounded" />
                 <video ref={remoteVideoRef} autoPlay playsInline className="w-64 h-48 bg-black rounded" />

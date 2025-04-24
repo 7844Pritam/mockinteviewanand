@@ -49,7 +49,7 @@ export default function InterviewerList() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-6 bg-black text-white">
       <Navbar />
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold">All Users</h2>
