@@ -16,6 +16,7 @@ const SimpleVideoChat = () => {
     const localStream = useRef(null);
 
     const [connected, setConnected] = useState(false);
+    const [unsupported, setUnsupported] = useState(false);
 
     const { id: otherId } = useParams();
     const navigate = useNavigate();
@@ -36,8 +37,14 @@ const SimpleVideoChat = () => {
         const setupConnection = async () => {
             if (!myId || !otherId) return;
 
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                setUnsupported(true);
+                alert('Screen sharing is not supported on this device or browser.');
+                return;
+            }
+
             try {
-                console.log('Initializing screen sharing...');
+                console.log('Requesting screen and audio...');
                 const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
                 const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
@@ -46,7 +53,6 @@ const SimpleVideoChat = () => {
                 localStream.current = screenStream;
                 localVideoRef.current.srcObject = screenStream;
 
-                // Handle screen sharing stop
                 screenStream.getVideoTracks()[0].addEventListener('ended', () => {
                     console.log('Screen sharing stopped');
                     endCall();
@@ -103,9 +109,9 @@ const SimpleVideoChat = () => {
                     }
                 });
 
-            } catch (err) {
-                console.error('Error during screen sharing setup:', err);
-                alert('Error accessing screen or audio. Please check permissions.');
+            } catch (error) {
+                console.error('Error during screen sharing setup:', error);
+                alert('Permission denied or screen/audio access failed. Please try again.');
             }
         };
 
@@ -144,22 +150,30 @@ const SimpleVideoChat = () => {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900">
-            <div className="flex gap-4">
-                <video ref={localVideoRef} autoPlay muted playsInline className="w-64 h-48 bg-black rounded" />
-                <video ref={remoteVideoRef} autoPlay playsInline className="w-64 h-48 bg-black rounded" />
-            </div>
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+            {unsupported ? (
+                <div className="text-red-600 font-semibold">
+                    Screen sharing is not supported on this browser or device.
+                </div>
+            ) : (
+                <>
+                    <div className="flex gap-4">
+                        <video ref={localVideoRef} autoPlay muted playsInline className="w-64 h-48 bg-black rounded" />
+                        <video ref={remoteVideoRef} autoPlay playsInline className="w-64 h-48 bg-black rounded" />
+                    </div>
 
-            <div className="mt-4 space-x-4">
-                {!connected && (
-                    <button onClick={startCall} className="px-4 py-2 bg-green-500 text-white rounded">
-                        Start Call
-                    </button>
-                )}
-                <button onClick={endCall} className="px-4 py-2 bg-red-500 text-white rounded">
-                    End Call
-                </button>
-            </div>
+                    <div className="mt-4 space-x-4">
+                        {!connected && (
+                            <button onClick={startCall} className="px-4 py-2 bg-green-500 text-white rounded">
+                                Start Call
+                            </button>
+                        )}
+                        <button onClick={endCall} className="px-4 py-2 bg-red-500 text-white rounded">
+                            End Call
+                        </button>
+                    </div>
+                </>
+            )}
         </div>
     );
 };
